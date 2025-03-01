@@ -1,0 +1,17 @@
+[package]
+name = "testing-bridge-indexer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mongodb = "3.2.1"
+tokio = { version = "1", features = ["full"] }
+futures = "0.3.31"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_with = "3.12"
+
+omni-types = { git = "https://github.com/near-one/omni-bridge", package = "omni-types", rev = "06b273b9986abf42e0e9a52ca279c6c3a941c405" }
+near-primitives = "0.28.0"
+near-sdk = "5.8.1"
+bson = "2.13.0"
