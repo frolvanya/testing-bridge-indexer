@@ -13,29 +13,27 @@ impl From<OmniEventOld> for OmniEvent {
             id: event.id,
             transaction_id: event.get_transaction_id(),
             origin: event.get_origin(),
-            event: OmniEventData::from(event.event),
-        }
-    }
-}
-
-impl From<OmniEventDataOld> for OmniEventData {
-    fn from(event: OmniEventDataOld) -> Self {
-        match event {
-            OmniEventDataOld::Transaction(event) => {
-                OmniEventData::Transaction(OmniTransactionEvent {
-                    transfer_message: event.transfer_message.clone(),
-                    sender: event.get_sender(),
-                    transfer_id: event.transfer_id,
-                    status: event.status,
-                    enrichment_data:
-                        bridge_indexer_types::documents_types::OmniEnrichmentData::from(
-                            event.enrichment_data,
-                        ),
-                })
-            }
-            OmniEventDataOld::Meta(event) => OmniEventData::Meta(OmniMetaEvent {
-                details: event.details,
-            }),
+            event: match event.event {
+                OmniEventDataOld::Transaction(tx) => {
+                    OmniEventData::Transaction(OmniTransactionEvent {
+                        transfer_message: tx.transfer_message.clone(),
+                        sender: tx.get_sender(),
+                        transfer_id: tx.transfer_id,
+                        status: tx.status,
+                        enrichment_data:
+                            bridge_indexer_types::documents_types::OmniEnrichmentData::from(
+                                if event.enrichment_data.is_none() {
+                                    tx.enrichment_data
+                                } else {
+                                    event.enrichment_data
+                                },
+                            ),
+                    })
+                }
+                OmniEventDataOld::Meta(meta) => OmniEventData::Meta(OmniMetaEvent {
+                    details: meta.details,
+                }),
+            },
         }
     }
 }
@@ -47,6 +45,8 @@ pub struct OmniEventOld {
     pub id: Option<ObjectId>,
     #[serde(flatten)]
     pub event: OmniEventDataOld,
+    #[serde(default, skip_serializing_if = "OmniEnrichmentData::is_none")]
+    pub enrichment_data: OmniEnrichmentData,
 }
 
 impl OmniEventOld {
