@@ -1,31 +1,39 @@
-use bridge_indexer_types::documents_types::{OmniMetaEvent, OmniTransactionEvent};
-use bson::{from_bson, Bson, Document};
-use futures::stream::StreamExt;
-use mongodb::{options::ClientOptions, Client, Collection};
-use serde::{de::DeserializeOwned, Serialize};
+use std::io::Write;
 
-async fn watch_collections<T>(collection: Collection<Document>)
-where
-    T: DeserializeOwned + Serialize + std::fmt::Debug,
-{
-    let mut stream = collection.watch().await.unwrap();
-    while let Some(change) = stream.next().await {
-        match change {
-            Ok(doc) => {
-                if let Some(full_document) = doc.full_document {
-                    match from_bson::<T>(Bson::Document(full_document)) {
-                        Ok(json) => {
-                            println!("Change detected:\n{:?}", json);
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to parse document: {:?}", e);
-                        }
-                    }
-                }
-            }
-            Err(e) => eprintln!("Error watching changes: {}", e),
-        }
+use bridge_indexer_types::documents_types::OmniEvent;
+use bson::doc;
+use futures::stream::StreamExt;
+use mongodb::{options::ClientOptions, Client, Database};
+
+use types::OmniEventOld;
+
+mod types;
+
+async fn migrate(db: Database, events: Vec<OmniEvent>) {
+    print!("Enter the new collection name: ");
+    std::io::stdout().flush().unwrap();
+    let mut new_collection_name = String::new();
+    std::io::stdin()
+        .read_line(&mut new_collection_name)
+        .unwrap();
+
+    print!("Do you want to make a migration? (y/n): ");
+
+    std::io::stdout().flush().unwrap();
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+
+    if input.trim() != "y" {
+        println!("Migration aborted.");
+        return;
     }
+
+    println!("Migrating...");
+
+    db.collection::<OmniEvent>(new_collection_name.trim())
+        .insert_many(events)
+        .await
+        .unwrap();
 }
 
 #[tokio::main]
@@ -36,19 +44,31 @@ async fn main() -> mongodb::error::Result<()> {
     let client = Client::with_options(client_options)?;
 
     let db = client.database("testnet_omni_bridge_db");
-    let omni_transactions_collection = db.collection::<bson::Document>("omni_transactions");
-    let omni_meta_events_collection = db.collection::<bson::Document>("omni_meta_events");
+    let collection = db.collection::<OmniEventOld>("omni_events");
+    let mut cursor = collection.find(doc! {}).await?;
 
-    let handles = vec![
-        tokio::spawn(watch_collections::<OmniTransactionEvent>(
-            omni_transactions_collection,
-        )),
-        tokio::spawn(watch_collections::<OmniMetaEvent>(
-            omni_meta_events_collection,
-        )),
-    ];
+    let mut new_events = Vec::new();
 
-    futures::future::join_all(handles).await;
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(event) => {
+                println!("Before: {:?}", event);
+
+                let after = OmniEvent::from(event);
+                println!("After: {:?}", after);
+                println!();
+
+                new_events.push(after);
+            }
+            Err(e) => {
+                panic!("Error: {}", e);
+            }
+        }
+    }
+
+    println!("Total events: {}", new_events.len());
+
+    migrate(db, new_events).await;
 
     Ok(())
 }

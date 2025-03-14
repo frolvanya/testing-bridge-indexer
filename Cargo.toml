@@ -11,7 +11,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_with = "3.12"
 
-near-primitives = "0.28.0"
+near-primitives = "0.29.1"
 near-sdk = "5.8.1"
 bson = "2.13.0"
-bridge-indexer-types = { git = "ssh://git@github.com/near-one/bridge-indexer-rs.git", package = "bridge-indexer-types", branch = "remove-unused-deps" }
+
+bridge-indexer-types = { git = "ssh://git@github.com/near-one/bridge-indexer-rs.git", package = "bridge-indexer-types", rev = "c9d82703e5f98645873aa130082b72a23b72aba4" }
+omni-types = { git = "https://github.com/near-one/omni-bridge", package = "omni-types", rev = "06b273b9986abf42e0e9a52ca279c6c3a941c405" }
